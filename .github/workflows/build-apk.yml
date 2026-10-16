@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download game repository
+      - name: Checkout Game
         uses: actions/checkout@v4
 
       - name: Setup Java
@@ -23,20 +23,30 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Prepare Game
+        run: |
+          mkdir -p www
+          cp index.html www/index.html
+          for f in *.css *.js *.png *.jpg *.jpeg *.webp *.svg *.mp3 *.wav; do
+            if [ -f "$f" ]; then
+              cp "$f" www/
+            fi
+          done
+
       - name: Install Capacitor
         run: |
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android
 
-      - name: Create Capacitor configuration
+      - name: Configure Android App
         run: |
-          mkdir -p www
-          cp *.html www/index.html
-          cp -r *.css *.js *.png *.jpg *.jpeg *.webp www/ 2>/dev/null || true
           node -e "require('fs').writeFileSync('capacitor.config.json', JSON.stringify({appId:'com.svgroup.goldensnake',appName:'SV GROUP Golden Snake Game',webDir:'www'}))"
 
-      - name: Add Android platform
+      - name: Create Android Project
         run: npx cap add android
+
+      - name: Sync Android Project
+        run: npx cap sync android
 
       - name: Build APK
         run: |
