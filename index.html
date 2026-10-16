@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SV GROUP Golden Snake Game</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;padding:14px;background:#050505;color:#f6d568;
+ font-family:Arial,sans-serif;text-align:center
+}
+h1{margin:8px 0;text-shadow:0 0 15px #d4af37}
+h2{font-size:19px}
+.panel{
+ max-width:480px;margin:12px auto;padding:12px;
+ border:1px solid #d4af37;border-radius:14px;
+ background:linear-gradient(145deg,#17130a,#050505);
+ box-shadow:0 0 12px #4b390d
+}
+.stats{display:flex;justify-content:space-around;margin:12px}
+canvas{
+ display:block;width:min(90vw,360px);height:min(90vw,360px);
+ margin:auto;border:3px solid #d4af37;border-radius:12px;
+ background:#071008;touch-action:none
+}
+button{
+ padding:11px 13px;margin:4px;border:1px solid #ffe58a;
+ border-radius:10px;background:linear-gradient(#ffe58a,#b8860b);
+ color:#090909;font-weight:bold;font-size:14px;cursor:pointer
+}
+button:disabled{opacity:.45}
+#status{min-height:24px;font-size:14px}
+.skins{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px
+}
+.skin{
+ padding:10px 4px;border:1px solid #756022;border-radius:12px;
+ background:#0b0b0b;color:#fff
+}
+.skin.selected{border:2px solid #ffe36b;box-shadow:0 0 12px #b58c19}
+.skin .emoji{display:block;font-size:36px;margin-bottom:5px}
+.skin small{display:block;margin-top:5px;color:#d9d9d9}
+.free{color:#63ef80!important}
+.locked{color:#ff7777!important}
+.controls{
+ display:grid;grid-template-columns:60px 60px 60px;
+ justify-content:center;gap:5px
+}
+.controls button{font-size:22px;padding:10px 0;margin:0}
+#premiumBox{display:none}
+.price{font-size:30px;font-weight:bold;color:#ffe58a}
+.note{font-size:12px;color:#cfc7ad;line-height:1.6}
+#message{color:#fff1b0;line-height:1.5}
+</style>
+</head>
+<body>
+
+<h1>👑 SV GROUP 👑</h1>
+<h2>🐍 GOLDEN SNAKE GAME</h2>
+
+<div class="panel">
+ <div class="stats">
+  <span>स्कोर: <b id="score">0</b></span>
+  <span>रिकॉर्ड: <b id="best">0</b></span>
+ </div>
+ <canvas id="game" width="360" height="360"></canvas>
+ <p id="status">START दबाकर खेलें</p>
+ <button id="start">▶ START / RESTART</button>
+ <button id="pause">⏸ PAUSE</button>
+ <button id="music">🎵 MUSIC ON</button>
+ <div class="controls" style="margin-top:12px">
+  <span></span><button data-dir="up">⬆️</button><span></span>
+  <button data-dir="left">⬅️</button>
+  <button id="stop">⏸</button>
+  <button data-dir="right">➡️</button>
+  <span></span><button data-dir="down">⬇️</button><span></span>
+ </div>
+</div>
+
+<div class="panel">
+ <h2>✨ अपना साँप चुनें</h2>
+ <p class="note">पहला साँप मुफ़्त है। बाकी 4 प्रीमियम स्किन हैं।</p>
+ <div class="skins" id="skins"></div>
+</div>
+
+<div class="panel" id="premiumBox">
+ <h2>👑 PREMIUM SNAKE</h2>
+ <div id="message">प्रीमियम साँप इस्तेमाल करने के लिए सब्सक्रिप्शन चुनें।</div>
+ <p class="price">₹19 <small style="font-size:15px">/ माह</small></p>
+ <p>✔ सभी 5 साँपों की स्किन</p>
+ <p>✔ Golden • Emerald • Ruby • Diamond • SV Elite</p>
+ <button id="subscribe" style="width:90%;font-size:16px">
+  🔒 डेमो सब्सक्रिप्शन
+ </button>
+ <button id="closePremium">वापस जाएँ</button>
+ <p class="note">
+  DEMO MODE: यह बटन वास्तविक भुगतान नहीं करता।
+  यह केवल इसी पेज पर प्रीमियम स्किन का परीक्षण करता है।
+  वास्तविक भुगतान सत्यापन और मासिक सदस्यता के लिए सुरक्षित
+  पेमेंट गेटवे तथा सर्वर-बैकएंड जोड़ना आवश्यक है।
+ </p>
+</div>
+
+<p class="note">SV GROUP • GOLDEN GAMING</p>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const scoreEl=document.getElementById("score");
+const bestEl=document.getElementById("best");
+const statusEl=document.getElementById("status");
+
+const CELL=18, GRID=20;
+const skins=[
+ {name:"Golden Snake",emoji:"🐍",color:"#e8b923",light:"#fff0a0",free:true},
+ {name:"Emerald Snake",emoji:"🐍",color:"#00bd73",light:"#9affcb"},
+ {name:"Ruby Snake",emoji:"🐍",color:"#e52b36",light:"#ff9a9f"},
+ {name:"Diamond Snake",emoji:"🐍",color:"#169fff",light:"#bcecff"},
+ {name:"SV Elite Snake",emoji:"🐍",color:"#b58b28",light:"#fff0b0"}
+];
+
+let selectedSkin=0;
+let demoUnlocked=false;
+let snake=[],food={x:14,y:10};
+let dx=1,dy=0,score=0;
+let running=false,over=false,paused=false;
+let gameTimer=null,audio=null,musicTimer=null;
+let musicOn=true,musicIndex=0;
+
+let best=0;
+try{best=Number(localStorage.getItem("svGoldenSnakeBest"))||0}catch(e){}
+bestEl.textContent=best;
+
+const skinsBox=document.getElementById("skins");
+const premiumBox=document.getElementById("premiumBox");
+
+function renderSkins(){
+ skinsBox.innerHTML="";
+ skins.forEach((skin,i)=>{
+  const unlocked=i===0||demoUnlocked;
+  const btn=document.createElement("button");
+  btn.className="skin"+(selectedSkin===i?" selected":"");
+  btn.innerHTML=
+   '<span class="emoji">'+skin.emoji+'</span>'+
+   '<b>'+skin.name+'</b><small>'+
+   (i===0?'✓ FREE':unlocked?'✓ DEMO UNLOCKED':'🔒 PREMIUM')+
+   '</small>';
+  btn.addEventListener("click",()=>{
+   if(i!==0&&!demoUnlocked){
+    premiumBox.style.display="block";
+    document.getElementById("message").textContent=
+      skin.name+" लॉक है। ₹19/माह के प्रीमियम डेमो को देखें।";
+    premiumBox.scrollIntoView({behavior:"smooth",block:"center"});
+    return;
+   }
+   selectedSkin=i;
+   renderSkins();
+   draw();
+  });
+  skinsBox.appendChild(btn);
+ });
+}
+
+function initAudio(){
+ const AC=window.AudioContext||window.webkitAudioContext;
+ if(!AC)return;
+ if(!audio)audio=new AC();
+ if(audio.state==="suspended")audio.resume();
+}
+
+function beep(freq,duration,type="sine",volume=.1,delay=0){
+ if(!audio)return;
+ const osc=audio.createOscillator();
+ const gain=audio.createGain();
+ const t=audio.currentTime+delay;
+ osc.type=type;
+ osc.frequency.setValueAtTime(freq,t);
+ gain.gain.setValueAtTime(.001,t);
+ gain.gain.exponentialRampToValueAtTime(volume,t+.015);
+ gain.gain.exponentialRampToValueAtTime(.001,t+duration);
+ osc.connect(gain);gain.connect(audio.destination);
+ osc.start(t);osc.stop(t+duration+.03);
+}
+
+function eatSound(){
+ beep(650,.10,"sine",.16);
+ beep(950,.16,"sine",.13,.09);
+}
+function gameOverSound(){
+ beep(330,.20,"triangle",.16);
+ beep(247,.25,"triangle",.15,.22);
+ beep(165,.48,"sawtooth",.12,.48);
+}
+
+function stopMusic(){
+ if(musicTimer)clearInterval(musicTimer);
+ musicTimer=null;
+}
+function startMusic(){
+ stopMusic();
+ if(!musicOn||!audio||!running)return;
+ const notes=[392,494,587,494,440,523,659,523];
+ musicTimer=setInterval(()=>{
+  if(running&&musicOn){
+   beep(notes[musicIndex%notes.length],.20,"sine",.035);
+   musicIndex++;
+  }
+ },300);
+}
+
+function randomFood(){
+ let p;
+ do{
+  p={x:Math.floor(Math.random()*GRID),y:Math.floor(Math.random()*GRID)};
+ }while(snake.some(s=>s.x===p.x&&s.y===p.y));
+ return p;
+}
+
+function draw(){
+ ctx.clearRect(0,0,360,360);
+ ctx.strokeStyle="#182016";
+ ctx.lineWidth=.5;
+ for(let i=0;i<=360;i+=CELL){
+  ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,360);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(360,i);ctx.stroke();
+ }
+
+ const fx=food.x*CELL+9,fy=food.y*CELL+9;
+ ctx.save();ctx.shadowColor="#ffdf00";ctx.shadowBlur=15;
+ const fg=ctx.createRadialGradient(fx-3,fy-4,1,fx,fy,9);
+ fg.addColorStop(0,"#fff8bd");
+ fg.addColorStop(.4,"#ffdc24");
+ fg.addColorStop(1,"#a76a00");
+ ctx.fillStyle=fg;ctx.beginPath();ctx.arc(fx,fy,7,0,Math.PI*2);ctx.fill();
+ ctx.restore();
+
+ const skin=skins[selectedSkin];
+ snake.forEach((s,i)=>{
+  const x=s.x*CELL,y=s.y*CELL,pad=i===0?1:2;
+  ctx.save();ctx.shadowColor=skin.color;ctx.shadowBlur=i===0?12:5;
+  const g=ctx.createLinearGradient(x,y,x+CELL,y+CELL);
+  g.addColorStop(0,skin.light);
+  g.addColorStop(.4,skin.color);
+  g.addColorStop(1,"#252016");
+  ctx.fillStyle=g;
+  ctx.beginPath();
+  ctx.roundRect(x+pad,y+pad,CELL-pad*2,CELL-pad*2,6);
+  ctx.fill();ctx.restore();
+  if(i===0){
+   ctx.fillStyle="#171000";
+   ctx.beginPath();
+   ctx.arc(x+6,y+6,2,0,Math.PI*2);
+   ctx.arc(x+13,y+6,2,0,Math.PI*2);
+   ctx.fill();
+  }
+ });
+}
+
+function newGame(){
+ initAudio();clearInterval(gameTimer);stopMusic();
+ snake=[{x:8,y:10},{x:7,y:10},{x:6,y:10}];
+ dx=1;dy=0;score=0;over=false;paused=false;running=true;
+ scoreEl.textContent=score;
+ statusEl.textContent="🎮 खाना खाइए और स्कोर बढ़ाइए!";
+ food=randomFood();draw();
+ gameTimer=setInterval(tick,145);startMusic();
+}
+
+function tick(){
+ if(!running||over||paused)return;
+ const head={x:snake[0].x+dx,y:snake[0].y+dy};
+ const eating=head.x===food.x&&head.y===food.y;
+ const body=eating?snake:snake.slice(0,-1);
+
+ if(head.x<0||head.x>=GRID||head.y<0||head.y>=GRID||
+ body.some(s=>s.x===head.x&&s.y===head.y)){
+  finishGame();return;
+ }
+ snake.unshift(head);
+ if(eating){
+  score+=10;scoreEl.textContent=score;eatSound();
+  if(score>best){
+   best=score;bestEl.textContent=best;
+   try{localStorage.setItem("svGoldenSnakeBest",best)}catch(e){}
+  }
+  food=randomFood();
+  statusEl.textContent="✨ +10 पॉइंट!";
+ }else{snake.pop()}
+ draw();
+}
+
+function finishGame(){
+ running=false;over=true;
+ clearInterval(gameTimer);stopMusic();
+ statusEl.textContent="💥 GAME OVER! फिर से खेलने के लिए START दबाएँ";
+ gameOverSound();draw();
+}
+
+function changeDirection(dir){
+ if(!running||over||paused)return;
+ const d={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+ const [nx,ny]=d[dir];
+ if(nx===-dx&&ny===-dy)return;
+ dx=nx;dy=ny;
+}
+
+document.querySelectorAll("[data-dir]").forEach(b=>{
+ b.addEventListener("click",()=>{
+  initAudio();changeDirection(b.dataset.dir);
+ });
+});
+
+document.getElementById("start").onclick=newGame;
+
+function togglePause(){
+ if(!running||over)return;
+ paused=!paused;
+ statusEl.textContent=paused?"⏸ गेम रुका है":"▶️ गेम जारी है";
+ if(paused)stopMusic();else startMusic();
+}
+document.getElementById("pause").onclick=togglePause;
+document.getElementById("stop").onclick=togglePause;
+
+document.getElementById("music").onclick=()=>{
+ initAudio();musicOn=!musicOn;
+ document.getElementById("music").textContent=
+  musicOn?"🎵 MUSIC ON":"🔇 MUSIC OFF";
+ if(musicOn&&running&&!paused)startMusic();else stopMusic();
+};
+
+document.getElementById("subscribe").onclick=()=>{
+ // केवल डेमो: कोई वास्तविक भुगतान नहीं किया जाता।
+ demoUnlocked=true;
+ selectedSkin=1;
+ renderSkins();
+ draw();
+ document.getElementById("message").textContent=
+  "डेमो सफल! सभी स्किन इस पेज पर परीक्षण के लिए खुल गईं। कोई भुगतान नहीं हुआ।";
+ statusEl.textContent="✨ Premium demo unlocked!";
+};
+
+document.getElementById("closePremium").onclick=()=>{
+ premiumBox.style.display="none";
+};
+
+document.addEventListener("keydown",e=>{
+ const k={ArrowUp:"up",ArrowDown:"down",ArrowLeft:"left",ArrowRight:"right"};
+ if(k[e.key]){e.preventDefault();changeDirection(k[e.key]);}
+ if(e.code==="Space"){e.preventDefault();togglePause();}
+});
+
+snake=[{x:8,y:10},{x:7,y:10},{x:6,y:10}];
+renderSkins();
+draw();
+</script>
+</body>
+</html>
