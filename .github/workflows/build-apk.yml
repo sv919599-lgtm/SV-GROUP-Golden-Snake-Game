@@ -1,0 +1,50 @@
+name: Build SV Group Snake APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download game repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Capacitor
+        run: |
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Create Capacitor configuration
+        run: |
+          mkdir -p www
+          cp *.html www/index.html
+          cp -r *.css *.js *.png *.jpg *.jpeg *.webp www/ 2>/dev/null || true
+          node -e "require('fs').writeFileSync('capacitor.config.json', JSON.stringify({appId:'com.svgroup.goldensnake',appName:'SV GROUP Golden Snake Game',webDir:'www'}))"
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SV-GROUP-Golden-Snake-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
